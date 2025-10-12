@@ -1,52 +1,29 @@
-// search
-import fetch from "node-fetch";
+#!/usr/bin/env node // golet.js // Node script: fetch a remote text file and check whether a provided Ethereum address appears in it. // Usage: //   node golet.js <eth_address> // Example: //   node golet.js 0xFeB463cDa1701E33F7fa4ea35d4E4856385A7849
 
-// URL file kamu di Litterbox
-const url = "https://litter.catbox.moe/fafc7i.txt";
+const SOURCE = 'https://litter.catbox.moe/fafc7i.txt'; const args = process.argv.slice(2);
 
-// Ambil keyword dari argumen terminal
-const keyword = process.argv[2];
+if (args.length === 0) { console.error('Usage: node golet.js <eth_address>'); process.exit(2); }
 
-if (!keyword) {
-  console.log("⚠️  Harap masukkan kata kunci setelah perintah. Contoh:");
-  console.log("   node search_addresses.js jakarta\n");
-  process.exit(1);
-}
+const target = args[0].trim(); const ethRegexFull = /^0x[a-fA-F0-9]{40}$/; if (!ethRegexFull.test(target)) { console.error('Invalid Ethereum address format. Expect 0x followed by 40 hex characters.'); process.exit(3); }
 
-async function main() {
-  console.log(`🔍 Mengambil data dari: ${url} ...`);
-  const res = await fetch(url);
+// helper to get fetch (Node >=18 has global fetch) async function getFetch() { if (typeof fetch !== 'undefined') return fetch; try { const mod = await import('node-fetch'); return mod.default; } catch (err) { throw new Error('fetch is not available. Run on Node >=18 or install node-fetch (npm install node-fetch).'); } }
 
-  if (!res.ok) throw new Error(`Gagal fetch file (${res.status})`);
+async function main() { const fetchFn = await getFetch(); console.error(Fetching: ${SOURCE});
 
-  const text = await res.text();
-  console.log("✅ File berhasil diambil.\n");
+let res; try { res = await fetchFn(SOURCE); } catch (err) { console.error('Network error while fetching source:', err.message || err); process.exitCode = 4; return; }
 
-  const lines = text.split(/\r?\n/);
-  const matches = lines.filter(line =>
-    line.toLowerCase().includes(keyword.toLowerCase())
-  );
+if (!res.ok) { console.error(HTTP error ${res.status} ${res.statusText}); process.exitCode = 5; return; }
 
-  console.log(`📊 Jumlah baris total: ${lines.length.toLocaleString()}`);
-  console.log(`📍 Jumlah yang mengandung kata "${keyword}": ${matches.length.toLocaleString()}\n`);
+const text = await res.text();
 
-  if (matches.length > 0) {
-    console.log("🪄 Contoh hasil yang cocok:\n");
-    console.log(matches.slice(0, 5).join("\n"));
-  } else {
-    console.log("😶 Tidak ada hasil yang cocok dengan kata kunci tersebut.");
-  }
+// We'll search using a case-insensitive regex for the exact address const findRegex = new RegExp(target, 'i'); const found = findRegex.test(text);
 
-  console.log("\n✨ Analisis singkat:");
-  if (matches.length === 0) {
-    console.log(`- Tidak ditemukan kemunculan kata "${keyword}" di dataset.`);
-  } else if (matches.length < 10) {
-    console.log(`- Kata "${keyword}" muncul jarang — area ini mungkin minoritas.`);
-  } else if (matches.length < 1000) {
-    console.log(`- Kata "${keyword}" muncul cukup sering — area ini punya representasi moderat.`);
-  } else {
-    console.log(`- Wow! Kata "${keyword}" sangat sering muncul — kemungkinan besar ini area utama di data tersebut.`);
-  }
-}
+if (found) { // Optionally show the line(s) where it's found const lines = text.split(/ ? /); const matchedLines = lines.filter(l => findRegex.test(l));
 
-main().catch(console.error);
+console.log('FOUND: ' + target);
+console.log('
+
+Context lines:'); matchedLines.forEach((l, i) => { console.log(${i+1}: ${l}); }); } else { console.log('NOT FOUND: ' + target); } }
+
+main().catch(err => { console.error('Unhandled error:', err); process.exit(1); });
+
